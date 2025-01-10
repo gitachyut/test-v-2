@@ -1,0 +1,103 @@
+name: Automation Trigger
+
+on:
+  # Manually triggered workflow with inputs
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - performance
+      language:
+        description: 'Language'
+        required: true
+        default: 'en'
+        type: choice
+        options:
+          - en
+          - fr
+      browser:
+        description: 'Browser'
+        required: true
+        default: 'chrome'
+        type: choice
+        options:
+          - Firefox
+          - Chrome
+          - iPhone
+          - all
+      tag:
+        description: 'Tag'
+        required: false
+        default: 'smoke or regression or custom string 🎉🤣'
+        type: string
+      config:
+        description: 'Config Level'
+        required: true
+        default: 'multi'
+        type: choice
+        options:
+          - single
+          - multi
+
+jobs:
+  subgraph-tests:
+    name: Run Subgraph Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      # Checkout the repository
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      # Install dependencies
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+        working-directory: e2e
+
+      # Install Playwright Browsers (if needed)
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps
+        working-directory: e2e
+
+      # Pass inputs as environment variables (optional step)
+      - name: Set environment variables
+        run: echo "Setting environment variables"
+        env:
+          ENVIRONMENT: ${{ github.event.inputs.environment }}
+          LANGUAGE: ${{ github.event.inputs.language }}
+          BROWSER: ${{ github.event.inputs.browser }}
+          TAG: ${{ github.event.inputs.tag }}
+          CONFIG: ${{ github.event.inputs.config }}
+        
+      # Run the `yarn subgraph:all` script
+      - name: Run Subgraph Tests
+        run: yarn subgraph:all
+        working-directory: e2e
+        env:
+          ENVIRONMENT: ${{ github.event.inputs.environment }}
+          LANGUAGE: ${{ github.event.inputs.language }}
+          BROWSER: ${{ github.event.inputs.browser }}
+          TAG: ${{ github.event.inputs.tag }}
+          CONFIG: ${{ github.event.inputs.config }}
+
+      # Upload the results if any (this step is optional, can be adjusted)
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: subgraph-test-results
+          path: e2e/subgraph-results/
+          retention-days: 7
